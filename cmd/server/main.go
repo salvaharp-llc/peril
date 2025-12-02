@@ -38,12 +38,12 @@ func main() {
 
 		switch words[0] {
 		case "pause":
-			log.Print("Pausing the game")
+			log.Println("Pausing the game")
 			err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
 				IsPaused: true,
 			})
 		case "resume":
-			log.Print("Resuming the game")
+			log.Println("Resuming the game")
 			err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
 				IsPaused: false,
 			})
@@ -51,10 +51,10 @@ func main() {
 			log.Println("Exiting the game")
 			os.Exit(0)
 		default:
-			log.Println("Unknown command")
+			fmt.Println("Unknown command")
 		}
 		if err != nil {
-			log.Printf("Couldn't publish JSON: %v", err)
+			log.Printf("Couldn't publish JSON: %v\n", err)
 		}
 	}
 }
