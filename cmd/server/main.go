@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/salvaharp/peril/internal/gamelogic"
 	"github.com/salvaharp/peril/internal/pubsub"
 	"github.com/salvaharp/peril/internal/routing"
 )
@@ -21,7 +21,7 @@ func main() {
 		log.Fatalf("Unable to connect with RabbitMQ server: %v", err)
 	}
 	defer conn.Close()
-	fmt.Println("Successfully connected to RabbitMQ")
+	fmt.Println("Server successfully connected to RabbitMQ")
 
 	ch, err := conn.Channel()
 	if err != nil {
@@ -29,16 +29,32 @@ func main() {
 	}
 	defer ch.Close()
 
-	err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
-		IsPaused: true,
-	})
-	if err != nil {
-		log.Printf("Couldn't publish JSON: %v", err)
-	}
+	gamelogic.PrintServerHelp()
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
 
-	// wait for ctrl+c
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
-	fmt.Println("Shutting down RabbitMQ connection")
+		switch words[0] {
+		case "pause":
+			log.Print("Pausing the game")
+			err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
+				IsPaused: true,
+			})
+		case "resume":
+			log.Print("Resuming the game")
+			err = pubsub.PublishJSON(ch, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
+				IsPaused: false,
+			})
+		case "quit":
+			log.Println("Exiting the game")
+		default:
+			log.Println("Unknown command")
+			os.Exit(0)
+		}
+		if err != nil {
+			log.Printf("Couldn't publish JSON: %v", err)
+		}
+	}
 }

@@ -22,7 +22,7 @@ func main() {
 		log.Fatalf("Unable to connect with RabbitMQ server: %v", err)
 	}
 	defer conn.Close()
-	fmt.Println("Successfully connected to RabbitMQ")
+	fmt.Println("Client successfully connected to RabbitMQ")
 
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
