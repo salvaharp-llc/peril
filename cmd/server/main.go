@@ -49,9 +49,9 @@ func main() {
 			})
 		case "quit":
 			log.Println("Exiting the game")
+			os.Exit(0)
 		default:
 			log.Println("Unknown command")
-			os.Exit(0)
 		}
 		if err != nil {
 			log.Printf("Couldn't publish JSON: %v", err)
