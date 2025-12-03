@@ -23,11 +23,19 @@ func main() {
 	defer conn.Close()
 	fmt.Println("Server successfully connected to RabbitMQ")
 
-	ch, err := conn.Channel()
+	ch, queue, err := pubsub.DeclareAndBind(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		routing.GameLogSlug+".*",
+		pubsub.SimpleQueueDurable,
+	)
 	if err != nil {
-		log.Fatalf("Unable to create RabbitMQ channel: %v", err)
+		log.Fatalf("could not declare %s queue: %v", routing.GameLogSlug, err)
 	}
 	defer ch.Close()
+
+	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
 
 	gamelogic.PrintServerHelp()
 	for {
