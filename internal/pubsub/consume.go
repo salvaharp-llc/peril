@@ -6,13 +6,22 @@ import (
 	"log"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/salvaharp/peril/internal/routing"
 )
 
 type SimpleQueueType int
 
+type AckType int
+
 const (
 	SimpleQueueDurable SimpleQueueType = iota
 	SimpleQueueTransient
+)
+
+const (
+	Ack AckType = iota
+	NackRequeue
+	NackDiscard
 )
 
 func SubscribeJSON[T any](
@@ -21,7 +30,7 @@ func SubscribeJSON[T any](
 	queueName,
 	key string,
 	queueType SimpleQueueType,
-	handler func(T),
+	handler func(T) AckType,
 ) error {
 	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -43,16 +52,25 @@ func SubscribeJSON[T any](
 
 	go func() {
 		defer ch.Close()
-		for m := range msgs {
+		for msg := range msgs {
 			var v T
-			err = json.Unmarshal(m.Body, &v)
+			err = json.Unmarshal(msg.Body, &v)
 			if err != nil {
 				log.Printf("Unable to unmarshal message: %v", err)
 				continue
 			}
 
-			handler(v)
-			err = m.Ack(false)
+			switch handler(v) {
+			case Ack:
+				err = msg.Ack(false)
+				fmt.Println("msg acknowledged")
+			case NackRequeue:
+				err = msg.Nack(false, true)
+				fmt.Println("msg negatively acknowledged and requeued")
+			case NackDiscard:
+				err = msg.Nack(false, false)
+				fmt.Println("msg negatively acknowledged and discarded")
+			}
 			if err != nil {
 				log.Printf("Unable to acknowledge message: %v", err)
 				continue
@@ -75,7 +93,9 @@ func DeclareAndBind(conn *amqp.Connection, exchange, queueName, key string, queu
 		queueType != SimpleQueueDurable, // delete when unused
 		queueType != SimpleQueueDurable, // exclusive
 		false,                           // no-wait
-		nil,                             // args
+		amqp.Table{
+			"x-dead-letter-exchange": routing.ExchangeDeadLetter,
+		}, // args
 	)
 	if err != nil {
 		return nil, amqp.Queue{}, fmt.Errorf("could not declare queue: %v", err)
