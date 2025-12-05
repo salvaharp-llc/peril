@@ -23,11 +23,11 @@ func main() {
 	defer conn.Close()
 	fmt.Println("Client successfully connected to RabbitMQ")
 
-	ch, err := conn.Channel()
+	publishCh, err := conn.Channel()
 	if err != nil {
 		log.Fatalf("Unable to create channel: %v", err)
 	}
-	defer ch.Close()
+	defer publishCh.Close()
 
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
@@ -54,10 +54,22 @@ func main() {
 		routing.ArmyMovesPrefix+"."+gs.GetUsername(),
 		routing.ArmyMovesPrefix+".*",
 		pubsub.SimpleQueueTransient,
-		handlerMove(gs),
+		handlerMove(gs, publishCh),
 	)
 	if err != nil {
 		log.Fatalf("could not subscribe to army moves: %v", err)
+	}
+
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix+".*",
+		pubsub.SimpleQueueDurable,
+		handlerWar(gs),
+	)
+	if err != nil {
+		log.Fatalf("could not subscribe to war declarations: %v", err)
 	}
 
 	for {
@@ -81,7 +93,7 @@ func main() {
 			}
 
 			err = pubsub.PublishJSON(
-				ch,
+				publishCh,
 				routing.ExchangePerilTopic,
 				routing.ArmyMovesPrefix+"."+move.Player.Username,
 				move,
