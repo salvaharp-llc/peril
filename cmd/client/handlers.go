@@ -17,7 +17,7 @@ func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) pubsub.Ack
 	}
 }
 
-func handlerMove(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.ArmyMove) pubsub.AckType {
+func handlerMove(gs *gamelogic.GameState, publishCh *amqp.Channel) func(gamelogic.ArmyMove) pubsub.AckType {
 	return func(am gamelogic.ArmyMove) pubsub.AckType {
 		defer fmt.Print("> ")
 		switch gs.HandleMove(am) {
@@ -25,7 +25,7 @@ func handlerMove(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.ArmyM
 			return pubsub.Ack
 		case gamelogic.MoveOutcomeMakeWar:
 			err := pubsub.PublishJSON(
-				ch,
+				publishCh,
 				routing.ExchangePerilTopic,
 				routing.WarRecognitionsPrefix+"."+gs.GetUsername(),
 				gamelogic.RecognitionOfWar{
@@ -47,10 +47,10 @@ func handlerMove(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.ArmyM
 	}
 }
 
-func handlerWar(gs *gamelogic.GameState) func(gamelogic.RecognitionOfWar) pubsub.AckType {
+func handlerWar(gs *gamelogic.GameState, publishCh *amqp.Channel) func(gamelogic.RecognitionOfWar) pubsub.AckType {
 	return func(rw gamelogic.RecognitionOfWar) pubsub.AckType {
 		defer fmt.Print("> ")
-		outcome, _, _ := gs.HandleWar(rw)
+		outcome, winner, loser := gs.HandleWar(rw)
 		switch outcome {
 		case gamelogic.WarOutcomeNotInvolved:
 			return pubsub.NackRequeue
@@ -59,8 +59,26 @@ func handlerWar(gs *gamelogic.GameState) func(gamelogic.RecognitionOfWar) pubsub
 		case gamelogic.WarOutcomeOpponentWon:
 			fallthrough
 		case gamelogic.WarOutcomeYouWon:
-			fallthrough
+			err := PublishGameLog(
+				publishCh,
+				gs.GetUsername(),
+				fmt.Sprintf("%s won a war against %s", winner, loser),
+			)
+			if err != nil {
+				fmt.Println(err)
+				return pubsub.NackRequeue
+			}
+			return pubsub.Ack
 		case gamelogic.WarOutcomeDraw:
+			err := PublishGameLog(
+				publishCh,
+				gs.GetUsername(),
+				fmt.Sprintf("A war between %s and %s resulted in a draw", winner, loser),
+			)
+			if err != nil {
+				fmt.Println(err)
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		default:
 			fmt.Println("error: unknown war outcome")
