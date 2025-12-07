@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -108,7 +109,23 @@ func main() {
 		case "help":
 			gamelogic.PrintClientHelp()
 		case "spam":
-			fmt.Println("Spamming not allowed yet!")
+			if len(words) < 2 {
+				fmt.Println("usage: spam <n>")
+				continue
+			}
+			n, err := strconv.Atoi(words[1])
+			if err != nil {
+				fmt.Printf("%s is not a valid number: %v\n", words[1], err)
+				continue
+			}
+			for range n {
+				err = PublishGameLog(publishCh, gs.GetUsername(), gamelogic.GetMaliciousLog())
+				if err != nil {
+					fmt.Printf("error publishing malicious log: %s\n", err)
+					continue
+				}
+			}
+			fmt.Printf("Published %v malicious logs\n", n)
 		case "quit":
 			gamelogic.PrintQuit()
 			os.Exit(0)

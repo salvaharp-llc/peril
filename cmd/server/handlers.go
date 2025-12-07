@@ -8,7 +8,7 @@ import (
 	"github.com/salvaharp/peril/internal/routing"
 )
 
-func handlerPause() func(routing.GameLog) pubsub.AckType {
+func handlerLog() func(routing.GameLog) pubsub.AckType {
 	return func(gl routing.GameLog) pubsub.AckType {
 		defer fmt.Print("> ")
 		err := gamelogic.WriteLog(gl)

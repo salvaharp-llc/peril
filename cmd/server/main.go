@@ -35,7 +35,7 @@ func main() {
 		routing.GameLogSlug,
 		routing.GameLogSlug+".*",
 		pubsub.SimpleQueueDurable,
-		handlerPause(),
+		handlerLog(),
 	)
 	if err != nil {
 		log.Fatalf("could not start consuming logs: %v", err)
